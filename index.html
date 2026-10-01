@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Delegado de guardia</title>
+<style>
+:root {
+  --bg: #101a2e; --panel: #172542; --panel2: #1f3157; --ink: #f4efe3; --mut: #9fb0cf;
+  --yo: #f2c14e; --yo-ink: #2b2208; --rub: #fffaf0; --rub-ink: #1d2433;
+  --ok: #4fc08d; --mal: #ef6f6c; --line: #2c4170; --ayuda: #e8505b;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: #0a111f; color: var(--ink); font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; }
+button { font: inherit; color: inherit; cursor: pointer; }
+#app { position: relative; display: flex; flex-direction: column; height: 100dvh; max-width: 520px; margin: 0 auto; background: var(--bg); box-shadow: 0 0 40px #0008; overflow: hidden; }
+
+header { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--panel2); display: grid; place-items: center; font-size: 22px; flex: none; }
+.who { flex: 1; min-width: 0; }
+.who b { display: block; font-size: 15px; }
+.who small { color: var(--mut); font-size: 12px; }
+.btn-ayuda { background: var(--ayuda); border: 0; border-radius: 999px; padding: 8px 14px; font-weight: 700; font-size: 13px; color: #fff; }
+.btn-alb { background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 7px 11px; font-size: 13px; color: var(--mut); }
+
+#chat { flex: 1; overflow-y: auto; padding: 14px 12px 8px; display: flex; flex-direction: column; gap: 8px; scroll-behavior: smooth;
+  background-image: radial-gradient(#ffffff08 1px, transparent 1px); background-size: 18px 18px; }
+.msg { max-width: 82%; padding: 9px 12px; border-radius: 14px; line-height: 1.38; font-size: 15px; animation: pop .22s ease-out; white-space: pre-wrap; }
+.msg.rub { align-self: flex-start; background: var(--rub); color: var(--rub-ink); border-bottom-left-radius: 4px; }
+.msg.yo { align-self: flex-end; background: var(--yo); color: var(--yo-ink); border-bottom-right-radius: 4px; }
+.tag { align-self: flex-end; font-size: 12px; color: var(--mut); margin: -4px 4px 0 0; animation: pop .3s ease-out; }
+.typing { align-self: flex-start; background: var(--rub); border-radius: 14px; border-bottom-left-radius: 4px; padding: 11px 14px; display: flex; gap: 4px; }
+.typing i { width: 7px; height: 7px; border-radius: 50%; background: #8a93a6; animation: bl 1s infinite; }
+.typing i:nth-child(2) { animation-delay: .15s; } .typing i:nth-child(3) { animation-delay: .3s; }
+@keyframes bl { 0%, 60%, 100% { opacity: .3; transform: none; } 30% { opacity: 1; transform: translateY(-3px); } }
+@keyframes pop { from { opacity: 0; transform: translateY(6px) scale(.98); } to { opacity: 1; transform: none; } }
+
+.card { align-self: stretch; border-radius: 12px; padding: 11px 13px; font-size: 14px; line-height: 1.4; animation: pop .3s ease-out; }
+.card.sticker { background: #2a1f3d; border: 1px dashed #b58cf0; color: #e6d6ff; }
+.card.nota { background: #2b2410; border: 1px solid #6b5a1c; color: #f3e3a8; }
+.card.clave { background: #0f2b22; border: 1px solid #2c7a5b; color: #cdf3e1; }
+.card b { display: block; margin-bottom: 3px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; opacity: .85; }
+.sep { align-self: center; color: var(--mut); font-size: 12px; margin: 6px 0; }
+
+#tray { background: var(--panel); border-top: 1px solid var(--line); padding: 10px 10px 12px; display: flex; flex-direction: column; gap: 8px; max-height: 52dvh; overflow-y: auto; }
+#tray:empty { display: none; }
+.hint { color: var(--mut); font-size: 12px; text-align: center; }
+.opt { text-align: left; background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font-size: 14.5px; line-height: 1.35; transition: transform .1s, background .15s; }
+.opt:hover:not(:disabled) { background: #28407a; }
+.opt:active:not(:disabled) { transform: scale(.985); }
+.opt:disabled { opacity: .45; cursor: default; text-decoration: line-through; }
+.opt small { display: block; margin-top: 3px; color: var(--mut); text-decoration: none; }
+.go { background: var(--yo); color: var(--yo-ink); border: 0; border-radius: 12px; padding: 12px; font-weight: 700; font-size: 15px; }
+.go:disabled { opacity: .4; cursor: default; }
+
+.draft { background: #fffaf0; color: var(--rub-ink); border-radius: 12px; padding: 12px; line-height: 1.7; font-size: 15px; }
+.seg { background: none; border: 0; padding: 1px 2px; border-radius: 4px; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.seg.fluff:hover { background: #ffe4a8; }
+.seg.fluff.out { text-decoration: line-through; opacity: .35; }
+.seg.keep { background: #dff4e8; }
+.seg.shake { animation: sh .35s; }
+@keyframes sh { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+.toast { text-align: center; color: var(--ok); font-size: 13px; min-height: 18px; }
+
+.overlay { position: absolute; inset: 0; background: var(--bg); z-index: 10; overflow-y: auto; padding: 22px 18px 28px; display: flex; flex-direction: column; gap: 14px; animation: pop .3s; }
+.overlay h1 { margin: 6px 0 0; font-size: 30px; line-height: 1.05; letter-spacing: -.01em; }
+.overlay h1 span { color: var(--yo); }
+.overlay h2 { margin: 0; font-size: 20px; }
+.overlay p { margin: 0; line-height: 1.45; color: #dbe3f3; }
+.box { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; line-height: 1.45; font-size: 14.5px; }
+.box b { color: var(--yo); }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+.row > button { flex: 1 1 140px; }
+.ghost { background: transparent; border: 1px solid var(--line); border-radius: 12px; padding: 11px; color: var(--ink); }
+.small { font-size: 12px; color: var(--mut); }
+.lista { margin: 0; padding-left: 20px; line-height: 1.5; font-size: 14.5px; }
+.lista li { margin-bottom: 4px; }
+
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.alb { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px; font-size: 13px; line-height: 1.3; text-align: left; min-height: 84px; }
+.alb.lock { border-style: dashed; color: var(--mut); }
+.alb .p { font-size: 11px; color: var(--mut); margin-bottom: 4px; }
+
+.modal { position: absolute; inset: 0; z-index: 20; background: #000a; display: grid; place-items: center; padding: 18px; }
+.modal .in { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 18px; max-width: 440px; width: 100%; max-height: 88dvh; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+.tel { font-size: 22px; font-weight: 800; color: var(--yo); letter-spacing: .01em; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; scroll-behavior: auto !important; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="avatar" aria-hidden="true">🧔</div>
+    <div class="who"><b>Rubén (Logística)</b><small id="estado">en línea</small></div>
+    <button class="btn-alb" id="bAlbum" title="Frases que no sirven">📒 <span id="albN">0</span>/15</button>
+    <button class="btn-ayuda" id="bAyuda">AYUDA</button>
+  </header>
+  <div id="chat" role="log" aria-live="polite"></div>
+  <div id="tray"></div>
+</div>
+
+<script>
+// =================================================================== contenido
+const PERSONAS = {
+  fiestero: { ico: '🎉', nom: 'El Fiestero' },
+  coach: { ico: '🧘', nom: 'El Coach Ontológico' },
+  nopasa: { ico: '🤷', nom: 'El NoPasaNada' },
+  delegado: { ico: '🤝', nom: 'El Delegado de guardia' }
+};
+
+const BEATS = [
+  { id: 'b1',
+    ruben: ['Delegado, ¿tenés un minuto?', 'Es por una compañera de mi sector. No sé si meterme o no, mirá.'],
+    opts: [
+      { p: 'fiestero', txt: '¡Rubén! El viernes es el asado del gremio, anotate. Ahí charlamos con un fernet en la mano 🍻',
+        react: ['Te escribo preocupado y me contestás con un menú. ¿Me estás cargando?', 'Mmm. No sé, che. Creo que el fernet no era lo que necesitaba.'],
+        why: 'Cambiar de tema o llevarlo a la joda le dice a la otra persona que lo que trae no es bienvenido.' },
+      { p: 'coach', txt: '¡Qué buena oportunidad, Rubén! Todo problema es un regalo disfrazado. ¿Qué te enseña esto de vos mismo?',
+        react: ['¿Un regalo disfrazado? ¿Hiciste un curso de fin de semana, vos?', 'Vine por un tema, no por un taller de autoayuda.'],
+        why: 'Las frases de manual suenan a que no se escuchó nada de lo que la persona dijo.' },
+      { p: 'nopasa', txt: 'Dale, Rubén, seguro no es para tanto, qué sé yo. Mañana lo vemos, que ahora estoy hasta acá.',
+        react: ['Ah... bueno. Entonces no era importante, no.', 'Ya me di vuelta, ¿eh? Mañana no sé si me animo.'],
+        why: 'Postergar o minimizar el primer intento de pedir ayuda puede hacer que no haya un segundo.' },
+      { p: 'delegado', ok: true, txt: 'Sí, Rubén. Contame. Tengo tiempo y te escucho.',
+        react: ['Gracias. No quería hablar de esto con cualquiera.'] }
+    ],
+    clave: 'Escuchá primero. Cuando alguien se anima a contar algo difícil, la primera reacción pesa mucho. Dar tiempo y atención ya es parte de la ayuda.' },
+
+  { id: 'b2',
+    ruben: ['Se llama Marcela. Hace unos meses que está rara: se aisló, dejó de bajar a almorzar con nosotros.',
+      'Ayer regaló las plantas de su escritorio y me dijo, como al pasar: «capaz mejor que no esté más por acá».',
+      'Pero ella siempre está de chiste... y dicen que el que avisa no lo hace. ¿No estaré exagerando?'],
+    opts: [
+      { p: 'fiestero', txt: 'Ay, Rubén, el que avisa no lo hace. Seguro quiere llamar la atención. ¡Invitala a bailar!',
+        react: ['¿Y si es de las que sí lo hace?', 'Eso lo dice mi tío en los asados. Y mi tío no es psicólogo, es dueño de una ferretería.'],
+        why: '«El que avisa no lo hace» es un mito. Muchas veces quien piensa en suicidarse da señales, y lo que dice hay que tomarlo en serio.' },
+      { p: 'coach', txt: 'Las palabras crean realidad, Rubén. No le des entidad a esa frase: tu atención la hace crecer.',
+        react: ['O sea que si no la miro, el problema desaparece. ¿Eso lo leíste o lo inventaste?', 'Marcela no tiene un problema de vibración. Tiene un problema, punto.'],
+        why: 'Hacerse el distraído no reduce el riesgo. Ignorar las señales sí puede empeorar las cosas.' },
+      { p: 'nopasa', txt: 'Y bueno, la gente dice cosas. Dejala, no pasa nada.',
+        react: ['¿Y si sí pasa algo? Prefiero equivocarme preocupándome que quedarme tranquilo.'],
+        why: 'Quitarle importancia a lo que dijo la deja sola. Ante la duda, es mejor tomarlo en serio.' },
+      { p: 'delegado', ok: true, txt: 'Hiciste bien en avisarme. «El que avisa no lo hace» es un mito. Cuando alguien avisa, aunque sea de costado o con un chiste, es una oportunidad de ayudar. Hay que tomarlo en serio.',
+        react: ['Entonces no estoy exagerando.', 'Me da alivio que me lo digas. Y me da cosa, a la vez.'] }
+    ],
+    clave: 'Muchas personas que piensan en suicidarse dan señales: se aíslan, se despiden, regalan cosas, dicen frases como «mejor no estar». Hacer chistes no descarta el sufrimiento. Tomarlas en serio no empeora nada. No hace falta ser profesional para notarlas: hay que animarse a preguntar.' },
+
+  { id: 'b3', tipo: 'recorte',
+    ruben: ['Ok. Pero me da un cagazo preguntarle. ¿Y si le meto la idea en la cabeza?',
+      'Mandame cómo se lo diría, así lo copio y listo.'],
+    consigna: 'Escribiste un mensaje larguísimo. Tachá lo que sobra: tocá cada parte que no ayuda.',
+    segs: [
+      { t: 'Mirá, yo no soy psicólogo ni nada, capaz es una pavada y no me hagas caso, pero ' },
+      { t: 'con el clima que hay, las paritarias y todo, quizás no es el momento, ' },
+      { t: 'buscá un lugar tranquilo y sin apuro, y preguntale de frente: ', keep: true },
+      { t: '«¿Estás pensando en suicidarte?». ', keep: true },
+      { t: 'Aunque si no te animás, no pasa nada, ' },
+      { t: 'mejor le preguntás si está cansada o le sugerís una aplicación de meditación, ' },
+      { t: 'y si se enoja, bueno, se enoja: mejor no hablar de ciertas cosas. ' },
+      { t: 'No la juzgues y escuchá lo que te diga.', keep: true }
+    ],
+    react: ['...Uf. Dicho así, de frente.', 'Pero tiene sentido: me da menos miedo que andar con vueltas.'],
+    clave: 'Preguntar de forma directa, clara y sin juicio. Las revisiones disponibles indican que preguntar no induce ideas suicidas y muchas veces alivia a la persona. Un lugar tranquilo y sin apuro ayuda.' },
+
+  { id: 'b4',
+    ruben: ['¿Y si me dice que sí? ¿Qué hago, che?'],
+    opts: [
+      { p: 'fiestero', txt: 'Llevala a bailar. Un finde de joda y se le pasa.',
+        react: ['Marcela con luces y reggaetón... Ni en pedo, tiene cara de que lo último que quiere es eso.'],
+        why: 'Distraer no resuelve el sufrimiento. Primero hay que escuchar.' },
+      { p: 'coach', txt: 'Regalale un libro de mindset y decile que la actitud lo es todo.',
+        react: ['Le doy un libro... y encima tiene que leerlo. ¿Te parece que eso es lo que le falta?', 'Si pudiera salir con actitud, ya lo habría hecho.'],
+        why: 'Decir que «la actitud lo es todo» le pone la culpa a la persona.' },
+      { p: 'nopasa', txt: 'Decile que hay gente que la pasa peor, que se ponga las pilas.',
+        react: ['No sé... si yo estuviera mal y me dijeran eso, me sentiría peor.'],
+        why: 'Comparar o pedir que «se ponga las pilas» suma culpa y vergüenza. No ayuda.' },
+      { p: 'delegado', ok: true, txt: 'Escucharla sin juzgar ni dar soluciones apuradas. Preguntarle cómo se siente y no dejarla sola. Y ayudarla a buscar ayuda profesional.',
+        react: ['Escuchar nomás. Eso sí creo que puedo hacerlo.'] }
+    ],
+    clave: 'Escuchar sin juzgar, sin comparar y sin dar soluciones rápidas. Si hay riesgo inmediato, no dejar sola a la persona y llamar a emergencias (911). Si no, ayudarla a conectar con un profesional o con una línea de ayuda.' },
+
+  { id: 'b5',
+    ruben: ['Última duda, y es fea: ¿y si me dice «te lo cuento, pero no le digas a nadie»?'],
+    opts: [
+      { p: 'fiestero', txt: '¡Secreto de sumario, Rubén! No se lo cuento ni a mi mamá.',
+        react: ['O sea que cargo yo solo con esto. ¿Te parece que eso es lo mejor para ella... o para mí?'],
+        why: 'Prometer secreto te deja solo con algo que excede lo que podés sostener, y a ella sin ayuda real.' },
+      { p: 'coach', txt: 'Respetá su proceso. Cada persona tiene su camino. No te metas.',
+        react: ['Su «proceso». O sea que, si está en riesgo, lo respeto... a distancia.', 'No sé, che.'],
+        why: 'Respetar no es desentenderse: cuando hay riesgo, hay que sumar a otras personas.' },
+      { p: 'nopasa', txt: 'Entonces mejor no te metas más. Ya hiciste bastante, Rubén.',
+        react: ['¿Ya hice bastante? Si todavía ni empecé.'],
+        why: 'Retirarse a mitad de camino deja a la persona más sola.' },
+      { p: 'delegado', ok: true, txt: 'No se puede prometer secreto cuando hay riesgo. Podés decirle con cariño: «me importás demasiado para guardarme esto». Y sumar a alguien que ayude: un familiar de confianza, un profesional o una línea.',
+        react: ['Se lo digo así. Con tus palabras me suena menos a traición.'] }
+    ],
+    clave: 'No prometas guardar el secreto: explicá con cariño por qué no podés. Sumá a una persona de confianza o a un profesional. Los números de ayuda están siempre al alcance en este juego (botón rojo, arriba).' },
+
+  { id: 'b6',
+    ruben: ['Listo, hoy hablo con ella. ¿Y mañana? ¿Hago de cuenta que no pasó nada?'],
+    opts: [
+      { p: 'fiestero', txt: 'Mañana le caés con una torta y globos, ¡que se anime!',
+        react: ['Torta y globos, delante de todo el sector. Va a querer que se la trague la tierra. O a mí.'],
+        why: 'Los gestos exagerados exponen y presionan. Mejor algo simple y en privado.' },
+      { p: 'coach', txt: 'Mandale un audio motivacional cada mañana, con un amanecer de fondo.',
+        react: ['Un amanecer. Todas las mañanas. Me va a bloquear en dos días.'],
+        why: 'Los mensajes motivacionales genéricos no reemplazan estar presente y preguntar de verdad.' },
+      { p: 'nopasa', txt: 'Mañana ya pasó, no remuevas.',
+        react: ['O sea que pregunto una vez y listo. ¿Y si mañana está peor?'],
+        why: 'El seguimiento importa: un mensaje al día siguiente le dice que no fue algo de una sola vez.' },
+      { p: 'delegado', ok: true, txt: 'Un mensaje simple: «pensé en vos, ¿cómo estás?». Sin presionar. Y seguir presente en los días que vienen.',
+        react: ['«Pensé en vos». Eso puedo.'] }
+    ],
+    clave: 'Seguir presente: un mensaje simple, sin presionar, importa. Y cuidate vos también: no sos profesional y acompañar pesa. Consultar a una línea o a un profesional también es para quienes acompañan.' }
+];
+
+// álbum: todas las respuestas que no sirven
+const ALB = [];
+BEATS.forEach((b, bi) => (b.opts || []).forEach(o => { if (!o.ok) ALB.push({ id: b.id + o.p, beat: bi + 1, ...o }); }));
+const TOTAL = ALB.length; // 15
+
+const AYUDA_FUENTE = 'Fuente: asistenciaalsuicida.org.ar, consultada el 01/10/2026.';
+
+// =================================================================== estado y utilidades
+const $ = s => document.querySelector(s);
+const chat = $('#chat'), tray = $('#tray');
+let S = { album: new Set(), wrong: 0 };
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const REDUCE = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function el(tag, cls, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
+function esc(s) { return s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
+function down() { chat.scrollTop = chat.scrollHeight; }
+function add(node) { chat.appendChild(node); down(); return node; }
+function bubble(side, txt) { return add(el('div', 'msg ' + side, esc(txt))); }
+function actualizarAlbum() { $('#albN').textContent = S.album.size; }
+
+async function rubenDice(lines) {
+  for (const l of lines) {
+    $('#estado').textContent = 'escribiendo...';
+    const t = add(el('div', 'typing', '<i></i><i></i><i></i>'));
+    await sleep(REDUCE ? 150 : Math.min(500 + l.length * 14, 1700));
+    t.remove(); bubble('rub', l);
+    $('#estado').textContent = 'en línea';
+    await sleep(REDUCE ? 50 : 250);
+  }
+}
+function barajar(a) { const r = a.slice(); for (let i = r.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [r[i], r[j]] = [r[j], r[i]]; } return r; }
+function esperarBoton(texto) {
+  return new Promise(res => {
+    tray.innerHTML = '';
+    const b = el('button', 'go', texto); b.onclick = () => { tray.innerHTML = ''; res(); }; tray.appendChild(b);
+  });
+}
+
+// =================================================================== un tramo de la conversación
+async function jugarEleccion(b) {
+  await rubenDice(b.ruben);
+  const orden = barajar(b.opts), probadas = new Set();
+  for (;;) {
+    const elegida = await new Promise(res => {
+      tray.innerHTML = '';
+      tray.appendChild(el('div', 'hint', 'Elegí qué le contestás'));
+      orden.forEach(o => {
+        const btn = el('button', 'opt', esc(o.txt));
+        if (probadas.has(o)) { btn.disabled = true; btn.innerHTML += `<small>${PERSONAS[o.p].ico} ${PERSONAS[o.p].nom}: ya probaste esta</small>`; }
+        btn.onclick = () => res(o);
+        tray.appendChild(btn);
+      });
+    });
+    tray.innerHTML = '';
+    bubble('yo', elegida.txt);
+    add(el('div', 'tag', `${PERSONAS[elegida.p].ico} Respondiste como ${PERSONAS[elegida.p].nom}`));
+    await sleep(REDUCE ? 100 : 450);
+    await rubenDice(elegida.react);
+    if (elegida.ok) {
+      add(el('div', 'card clave', `<b>Clave</b>${esc(b.clave)}`));
+      await esperarBoton('SEGUIR');
+      return;
+    }
+    probadas.add(elegida);
+    const id = b.id + elegida.p;
+    const nueva = !S.album.has(id);
+    if (nueva) { S.wrong++; S.album.add(id); actualizarAlbum(); }
+    add(el('div', 'card sticker', `<b>${nueva ? '¡Nueva en el álbum!' : 'Ya la tenías'}</b>${PERSONAS[elegida.p].ico} Frase que no sirve ${S.album.size}/${TOTAL}`));
+    add(el('div', 'card nota', `<b>Por qué no</b>${esc(elegida.why)}`));
+    await sleep(REDUCE ? 100 : 500);
+  }
+}
+
+async function jugarRecorte(b) {
+  await rubenDice(b.ruben);
+  await new Promise(res => {
+    tray.innerHTML = '';
+    tray.appendChild(el('div', 'hint', b.consigna));
+    const draft = el('div', 'draft');
+    const toast = el('div', 'toast');
+    const send = el('button', 'go', 'ENVIAR'); send.disabled = true;
+    const fluff = [];
+    b.segs.forEach(s => {
+      const sp = el('button', 'seg ' + (s.keep ? 'keep' : 'fluff'), esc(s.t));
+      sp.type = 'button';
+      if (s.keep) {
+        sp.onclick = () => { sp.classList.remove('shake'); void sp.offsetWidth; sp.classList.add('shake'); toast.textContent = 'Esa parte sirve. Dejala.'; };
+      } else {
+        fluff.push(sp);
+        sp.onclick = () => {
+          sp.classList.toggle('out');
+          const faltan = fluff.filter(x => !x.classList.contains('out')).length;
+          send.disabled = faltan > 0;
+          toast.textContent = faltan > 0 ? `Todavía sobra: ${faltan}` : 'Ahora sí. Mensaje claro.';
+        };
+      }
+      draft.appendChild(sp);
+    });
+    send.onclick = () => {
+      const txt = b.segs.filter(s => s.keep).map(s => s.t.trim()).join(' ');
+      tray.innerHTML = ''; bubble('yo', txt); res();
+    };
+    tray.append(draft, toast, send);
+    tray.scrollTop = 0;
+  });
+  await sleep(REDUCE ? 100 : 450);
+  await rubenDice(b.react);
+  add(el('div', 'card clave', `<b>Clave</b>${esc(b.clave)}`));
+  await esperarBoton('SEGUIR');
+}
+
+async function cierre() {
+  await rubenDice(['Gracias, de verdad. Hoy mismo me animo.', 'Che... ¿y vos cómo estás con todo esto? Se nota que te toca de cerca.']);
+  await new Promise(res => {
+    tray.innerHTML = '';
+    [['Bien, gracias por preguntar. Cualquier cosa, acá estoy.', 'Bien, gracias por preguntar'], ['La verdad, me pesó. Voy a hablar con alguien yo también.', 'Me pesó']].forEach(([t]) => {
+      const b = el('button', 'opt', esc(t)); b.onclick = () => { tray.innerHTML = ''; bubble('yo', t); res(); }; tray.appendChild(b);
+    });
+  });
+  await rubenDice(['Eso. Cuidarnos entre todos también es parte del laburo del gremio, ¿no?']);
+  await esperarBoton('VER MI RESULTADO');
+  final();
+}
+
+// =================================================================== pantallas
+function overlay(html) { const o = el('div', 'overlay', html); $('#app').appendChild(o); return o; }
+function modal(html) {
+  const m = el('div', 'modal', `<div class="in">${html}<button class="ghost" data-x>Cerrar</button></div>`);
+  m.onclick = e => { if (e.target === m || e.target.dataset.x !== undefined) m.remove(); };
+  $('#app').appendChild(m); return m;
+}
+
+function ayuda() {
+  modal(`<h2>Ayuda ahora</h2>
+    <div class="box"><b>Si hay riesgo inmediato</b> (para vos o para otra persona): no esperes. Llamá a emergencias, al <span class="tel">911</span>, o andá a una guardia.</div>
+    <div class="box"><b>Para hablar con alguien</b> del Centro de Asistencia al Suicida. También sirve si estás preocupado por otra persona.
+      <p style="margin-top:8px">Línea <span class="tel">135</span><br><span class="small">gratuita</span></p>
+      <p style="margin-top:8px"><span class="tel">(011) 5275-1135</span></p>
+      <p style="margin-top:8px"><span class="tel">0800 345 1435</span><br><span class="small">desde todo el país</span></p></div>
+    <p class="small">${AYUDA_FUENTE} Este juego es una capacitación: no reemplaza la atención de un profesional.</p>`);
+}
+
+function detalle(a) {
+  const nueva = !S.album.has(a.id);
+  if (nueva) { S.album.add(a.id); actualizarAlbum(); }
+  modal(`<h2>${PERSONAS[a.p].ico} ${PERSONAS[a.p].nom}</h2>
+    <div class="msg yo" style="max-width:100%">${esc(a.txt)}</div>
+    ${a.react.map(r => `<div class="msg rub" style="max-width:100%">${esc(r)}</div>`).join('')}
+    <div class="card nota"><b>Por qué no</b>${esc(a.why)}</div>`);
+}
+
+function album() {
+  const o = overlay(`<h2>📒 Frases que no sirven</h2>
+    <p class="small">Coleccionalas todas: la gracia es ver cómo reacciona Rubén. Tocá una bloqueada para descubrirla.</p>
+    <div class="grid" id="g"></div><button class="go" data-x>VOLVER</button>`);
+  const g = o.querySelector('#g');
+  const pintar = () => {
+    g.innerHTML = '';
+    ALB.forEach(a => {
+      const got = S.album.has(a.id);
+      const c = el('button', 'alb' + (got ? '' : ' lock'), got ? `<div class="p">${PERSONAS[a.p].ico} ${PERSONAS[a.p].nom} · tramo ${a.beat}</div>${esc(a.txt.length > 80 ? a.txt.slice(0, 78) + '…' : a.txt)}` : `<div class="p">${PERSONAS[a.p].ico} tramo ${a.beat}</div>🔒 ???`);
+      c.onclick = () => { detalle(a); pintar(); };
+      g.appendChild(c);
+    });
+  };
+  pintar();
+  o.querySelector('[data-x]').onclick = () => o.remove();
+}
+
+function perfil() {
+  const n = S.wrong;
+  if (n === 0) return ['🤝 DELEGADO DE GUARDIA', 'A la primera. Escuchaste, preguntaste y no prometiste secretos. Probá igual las frases torpes del álbum: Rubén tiene reacciones muy buenas.'];
+  if (n <= 6) return ['🌱 DELEGADO EN FORMACIÓN', 'Caíste en unas cuantas frases típicas, y no pasa nada: son las que todos decimos de nervios. Lo importante es que llegaste a la que sirve.'];
+  return ['📒 COLECCIONISTA DE FRASES TORPES', 'Probaste casi todo lo que no hay que decir. Eso, en un juego, es una virtud: ahora las reconocés cuando aparezcan en la vida real.'];
+}
+
+function final() {
+  const [titulo, texto] = perfil();
+  const o = overlay(`<div class="small">Tu resultado</div>
+    <h1>${titulo}</h1><p>${texto}</p>
+    <div class="box"><b>Lo que te llevás</b>
+      <ol class="lista">
+        <li>Escuchá primero y dale tiempo.</li>
+        <li>Las señales hay que tomarlas en serio, aunque vengan con un chiste. «El que avisa no lo hace» es un mito.</li>
+        <li>Preguntá directo y sin juicio: «¿Estás pensando en suicidarte?». Preguntar no induce, suele aliviar.</li>
+        <li>No des soluciones rápidas ni compares: escuchá.</li>
+        <li>No prometas secreto: sumá a alguien que ayude.</li>
+        <li>Seguí presente después, y cuidate vos también.</li>
+      </ol></div>
+    <div class="box"><b>Ayuda</b><br>Emergencia: 911 · Línea 135 (gratuita) · (011) 5275-1135 · 0800 345 1435</div>
+    <div class="row"><button class="go" id="fAlb">📒 Mi álbum (${S.album.size}/${TOTAL})</button><button class="ghost" id="fComp">Compartir</button><button class="ghost" id="fRep">Jugar de nuevo</button></div>
+    <p class="small">Juego de capacitación en revisión por profesionales de salud mental. No reemplaza la atención de un profesional. ${AYUDA_FUENTE}</p>`);
+  o.querySelector('#fAlb').onclick = album;
+  o.querySelector('#fRep').onclick = () => location.reload();
+  o.querySelector('#fComp').onclick = async () => {
+    const t = `Me tocó «${titulo.replace(/^\S+\s/, '')}» en Delegado de guardia. Probalo: aprendés a acompañar a alguien que la está pasando mal.`;
+    try { if (navigator.share) await navigator.share({ text: t, url: location.href }); else { await navigator.clipboard.writeText(t + ' ' + location.href); o.querySelector('#fComp').textContent = 'Copiado'; } } catch (e) { }
+  };
+}
+
+function intro() {
+  const o = overlay(`<div class="small">Capacitación para delegadas y delegados</div>
+    <h1>DELEGADO <span>DE GUARDIA</span></h1>
+    <p>Un compañero te escribe preocupado por otra persona. Vos sos el delegado: elegís qué contestarle. Algunas respuestas son... muy tuyas.</p>
+    <div class="box"><b>Cómo se juega.</b> Elegís una respuesta por vez. Si elegís una torpe, Rubén te lo hace notar (con humor) y podés probar otra. Sin tiempo ni puntaje: no es una carrera.</div>
+    <div class="box"><b>Sobre el humor.</b> Nos reímos de nuestras torpezas al acompañar, nunca de quien sufre.</div>
+    <div class="box"><b>Si te toca de cerca,</b> el botón rojo AYUDA está siempre arriba a la derecha.</div>
+    <button class="go" id="jugar">JUGAR (unos 7 minutos)</button>
+    <p class="small">Borrador para revisión de profesionales de salud mental.</p>`);
+  o.querySelector('#jugar').onclick = () => { o.remove(); partida(); };
+}
+
+async function partida() {
+  add(el('div', 'sep', 'Martes, 17:40. Rubén te escribe.'));
+  for (const b of BEATS) { b.tipo === 'recorte' ? await jugarRecorte(b) : await jugarEleccion(b); add(el('div', 'sep', '·')); }
+  await cierre();
+}
+
+$('#bAyuda').onclick = ayuda;
+$('#bAlbum').onclick = album;
+intro();
+</script>
+</body>
+</html>
